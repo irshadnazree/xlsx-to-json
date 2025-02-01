@@ -1,15 +1,15 @@
 // test/index.spec.ts
 
 /**
- * This test suite verifies the functionality of a Cloudflare Worker that converts XLSX files to JSON.
- * The worker accepts XLSX files via POST requests and returns their contents as JSON.
+ * This test suite verifies the functionality of a Cloudflare Worker that converts Excel files to JSON.
+ * The worker accepts both XLSX and XLS files via POST requests and returns their contents as JSON.
  */
 
 import { utils, write } from '@e965/xlsx';
 import { describe, expect, it } from 'vitest';
 import worker from '../src/index';
 
-describe('XLSX to JSON Worker', () => {
+describe('Excel to JSON Worker', () => {
 	/**
 	 * Test case: Verify that the worker only accepts POST requests
 	 */
@@ -73,6 +73,7 @@ describe('XLSX to JSON Worker', () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
 		expect(response.headers.get('X-Processing-Time')).toBeDefined();
+		expect(response.headers.get('X-File-Type')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
 		// Verify the JSON structure matches our input data
 		const jsonResponse = await response.json();
@@ -80,10 +81,52 @@ describe('XLSX to JSON Worker', () => {
 	});
 
 	/**
-	 * Test case: Verify handling of empty XLSX files
+	 * Test case: Verify successful XLS to JSON conversion
 	 */
-	it('should handle empty XLSX files', async () => {
-		// Create an empty XLSX workbook
+	it('should successfully convert XLS to JSON', async () => {
+		// Create a test XLS workbook with sample data
+		const workbook = utils.book_new();
+		const testData = [
+			['Product', 'Price', 'Quantity'],
+			['Widget A', 19.99, 100],
+			['Widget B', 29.99, 50],
+		];
+		const worksheet = utils.aoa_to_sheet(testData);
+		utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+
+		// Convert the workbook to a binary format (XLS)
+		const xlsData = new Uint8Array(write(workbook, { type: 'array', bookType: 'xls' }));
+
+		// Prepare the form data with the XLS file
+		const formData = new FormData();
+		formData.append(
+			'file',
+			new File([xlsData], 'test.xls', {
+				type: 'application/vnd.ms-excel',
+			})
+		);
+
+		const request = new Request('http://example.com', {
+			method: 'POST',
+			body: formData,
+		});
+
+		const response = await worker.fetch(request);
+		expect(response.status).toBe(200);
+		expect(response.headers.get('Content-Type')).toBe('application/json');
+		expect(response.headers.get('X-Processing-Time')).toBeDefined();
+		expect(response.headers.get('X-File-Type')).toBe('application/vnd.ms-excel');
+
+		// Verify the JSON structure matches our input data
+		const jsonResponse = await response.json();
+		expect(jsonResponse).toEqual(testData);
+	});
+
+	/**
+	 * Test case: Verify handling of empty Excel files
+	 */
+	it('should handle empty Excel files', async () => {
+		// Create an empty Excel workbook
 		const workbook = utils.book_new();
 		const worksheet = utils.aoa_to_sheet([]);
 		utils.book_append_sheet(workbook, worksheet, 'Sheet1');
@@ -150,6 +193,6 @@ describe('XLSX to JSON Worker', () => {
 
 		const response = await worker.fetch(request);
 		expect(response.status).toBe(400);
-		expect(await response.text()).toBe('Invalid file type. Please upload an XLSX file');
+		expect(await response.text()).toBe('Invalid file type. Please upload an Excel file (XLSX or XLS)');
 	});
 });

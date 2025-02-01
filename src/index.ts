@@ -1,12 +1,26 @@
 /**
- * This module provides an API endpoint for converting XLSX files to JSON format.
+ * This module provides an API endpoint for converting Excel files (XLSX/XLS) to JSON format.
  * It uses the @e965/xlsx library for efficient Excel file processing.
  */
 import { read, utils } from '@e965/xlsx';
 
 // Configuration constants for file validation
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // Maximum file size limit of 5MB
-const XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; // Valid XLSX MIME type
+
+// Valid Excel MIME types
+const EXCEL_MIME_TYPES = {
+	xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+	xls: 'application/vnd.ms-excel',
+};
+
+/**
+ * Validates if the given MIME type is a valid Excel format
+ * @param mimeType - The MIME type to validate
+ * @returns boolean indicating if the MIME type is valid
+ */
+const isValidExcelType = (mimeType: string): boolean => {
+	return Object.values(EXCEL_MIME_TYPES).includes(mimeType);
+};
 
 /**
  * Main Worker handler that processes incoming requests
@@ -34,15 +48,15 @@ export default {
 				return new Response(`File exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`, { status: 413 });
 			}
 
-			// Verify that the uploaded file is actually an XLSX file
-			if (file.type !== XLSX_MIME_TYPE) {
-				return new Response('Invalid file type. Please upload an XLSX file', { status: 400 });
+			// Verify that the uploaded file is a valid Excel file
+			if (!isValidExcelType(file.type)) {
+				return new Response('Invalid file type. Please upload an Excel file (XLSX or XLS)', { status: 400 });
 			}
 
 			// Convert the file to an ArrayBuffer for processing
 			const arrayBuffer = await file.arrayBuffer();
 
-			// Read the XLSX file with optimized settings for better performance
+			// Read the Excel file with optimized settings for better performance
 			const workbook = read(new Uint8Array(arrayBuffer), {
 				type: 'array', // Process as array buffer
 				sheets: 0, // Only parse the first sheet for efficiency
@@ -65,12 +79,13 @@ export default {
 				headers: {
 					'Content-Type': 'application/json',
 					'X-Processing-Time': `${performance.now()}ms`, // Include processing time in response headers
+					'X-File-Type': file.type, // Include the original file type in response headers
 				},
 			});
 		} catch (error) {
 			// Log and handle any errors that occur during processing
 			console.error(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			return new Response('Error processing XLSX file', { status: 500 });
+			return new Response('Error processing Excel file', { status: 500 });
 		}
 	},
 } satisfies ExportedHandler;
