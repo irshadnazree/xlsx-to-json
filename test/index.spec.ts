@@ -10,7 +10,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:
 // Import Vitest testing framework utilities
 import { beforeEach, describe, expect, it } from 'vitest';
 // Import XLSX library utilities for creating test files
-import { utils, write } from 'xlsx';
+import { utils, write } from '@e965/xlsx';
 // Import our worker implementation
 import worker from '../src/index';
 

@@ -17,6 +17,6 @@
     "wrangler": "^3.106.0"
   },
   "dependencies": {
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "@e965/xlsx": "^0.20.3"
   }
 }

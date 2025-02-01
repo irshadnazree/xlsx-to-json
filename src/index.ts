@@ -1,4 +1,4 @@
-import { read, utils } from 'xlsx';
+import { read, utils } from '@e965/xlsx';
 
 // Define the main Worker handler
 export default {
