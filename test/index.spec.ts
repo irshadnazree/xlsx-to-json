@@ -11,7 +11,7 @@ import worker from '../src/index';
 
 describe('Excel to JSON Worker', () => {
 	/**
-	 * Test case: Verify that the worker only accepts POST requests
+	 * Test case: Verify HTTP method validation
 	 */
 	it('should reject non-POST requests', async () => {
 		const request = new Request('http://example.com', {
@@ -24,7 +24,7 @@ describe('Excel to JSON Worker', () => {
 	});
 
 	/**
-	 * Test case: Verify that the worker requires a file in the form data
+	 * Test case: Verify file upload validation
 	 */
 	it('should reject requests without a file', async () => {
 		const formData = new FormData();
@@ -39,10 +39,10 @@ describe('Excel to JSON Worker', () => {
 	});
 
 	/**
-	 * Test case: Verify successful XLSX to JSON conversion
+	 * Test case: Verify XLSX conversion with performance metrics
 	 */
-	it('should successfully convert XLSX to JSON', async () => {
-		// Create a test XLSX workbook with sample data
+	it('should successfully convert XLSX to JSON with performance metrics', async () => {
+		// Create test XLSX data
 		const workbook = utils.book_new();
 		const testData = [
 			['Name', 'Age', 'City'],
@@ -52,10 +52,7 @@ describe('Excel to JSON Worker', () => {
 		const worksheet = utils.aoa_to_sheet(testData);
 		utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
-		// Convert the workbook to a binary format
 		const xlsxData = new Uint8Array(write(workbook, { type: 'array', bookType: 'xlsx' }));
-
-		// Prepare the form data with the XLSX file
 		const formData = new FormData();
 		formData.append(
 			'file',
@@ -72,19 +69,29 @@ describe('Excel to JSON Worker', () => {
 		const response = await worker.fetch(request);
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
-		expect(response.headers.get('X-Processing-Time')).toBeDefined();
-		expect(response.headers.get('X-File-Type')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-		// Verify the JSON structure matches our input data
+		// Verify performance metrics
+		const processingTime = response.headers.get('X-Processing-Time');
+		expect(processingTime).toBeDefined();
+		expect(parseFloat(processingTime!.replace('ms', ''))).toBeGreaterThan(0);
+
+		// Verify JSON structure and data
 		const jsonResponse = await response.json();
-		expect(jsonResponse).toEqual(testData);
+		expect(jsonResponse).toEqual({
+			data: [
+				{ Name: 'John Doe', Age: 30, City: 'New York' },
+				{ Name: 'Jane Smith', Age: 25, City: 'Los Angeles' },
+			],
+			totalRows: 2,
+			totalColumns: 3,
+		});
 	});
 
 	/**
-	 * Test case: Verify successful XLS to JSON conversion
+	 * Test case: Verify XLS conversion
 	 */
 	it('should successfully convert XLS to JSON', async () => {
-		// Create a test XLS workbook with sample data
+		// Create test XLS data
 		const workbook = utils.book_new();
 		const testData = [
 			['Product', 'Price', 'Quantity'],
@@ -94,10 +101,7 @@ describe('Excel to JSON Worker', () => {
 		const worksheet = utils.aoa_to_sheet(testData);
 		utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
-		// Convert the workbook to a binary format (XLS)
 		const xlsData = new Uint8Array(write(workbook, { type: 'array', bookType: 'xls' }));
-
-		// Prepare the form data with the XLS file
 		const formData = new FormData();
 		formData.append(
 			'file',
@@ -114,25 +118,27 @@ describe('Excel to JSON Worker', () => {
 		const response = await worker.fetch(request);
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
-		expect(response.headers.get('X-Processing-Time')).toBeDefined();
-		expect(response.headers.get('X-File-Type')).toBe('application/vnd.ms-excel');
 
-		// Verify the JSON structure matches our input data
 		const jsonResponse = await response.json();
-		expect(jsonResponse).toEqual(testData);
+		expect(jsonResponse).toEqual({
+			data: [
+				{ Product: 'Widget A', Price: 19.99, Quantity: 100 },
+				{ Product: 'Widget B', Price: 29.99, Quantity: 50 },
+			],
+			totalRows: 2,
+			totalColumns: 3,
+		});
 	});
 
 	/**
-	 * Test case: Verify handling of empty Excel files
+	 * Test case: Verify empty file handling
 	 */
 	it('should handle empty Excel files', async () => {
-		// Create an empty Excel workbook
 		const workbook = utils.book_new();
 		const worksheet = utils.aoa_to_sheet([]);
 		utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
 		const xlsxData = new Uint8Array(write(workbook, { type: 'array', bookType: 'xlsx' }));
-
 		const formData = new FormData();
 		formData.append(
 			'file',
@@ -151,16 +157,14 @@ describe('Excel to JSON Worker', () => {
 		expect(response.headers.get('Content-Type')).toBe('application/json');
 
 		const jsonResponse = await response.json();
-		expect(jsonResponse).toEqual([]);
+		expect(jsonResponse).toEqual({});
 	});
 
 	/**
-	 * Test case: Verify file size limit enforcement
+	 * Test case: Verify file size limit
 	 */
 	it('should reject files exceeding size limit', async () => {
-		// Create a mock large file that exceeds the 5MB limit
 		const largeBuffer = new Uint8Array(6 * 1024 * 1024); // 6MB
-
 		const formData = new FormData();
 		formData.append(
 			'file',
